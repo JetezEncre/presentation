@@ -86,7 +86,7 @@ function App() {
           <div className="text-center mb-16">
             <h2 className="font-display text-4xl font-bold text-[#1B3478] mb-4">L'activité</h2>
             <p className="text-gray-500 text-lg max-w-xl mx-auto">
-              Un savoir-faire artisanal et local, ancré dans la tradition namuroise.
+              Un savoir-faire artisanal et local, ancré dans la tradition.
             </p>
           </div>
           <div className="grid sm:grid-cols-3 gap-8">
