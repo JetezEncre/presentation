@@ -2,7 +2,7 @@ import { Phone, Mail, MapPin, MessageCircle, Shirt, Users, Award, Heart } from '
 
 const PHONE = '+32 491 50 05 29';
 const PHONE_RAW = '+32491500529';
-const EMAIL = 'jetez.lencre@outlook.fr';
+const EMAIL = 'jetez.lencre@outlook.com';
 
 function App() {
   return (
