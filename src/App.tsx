@@ -1,253 +1,242 @@
-import { Phone, Mail, MapPin, MessageCircle, Shirt, Users, Award, Heart } from 'lucide-react';
+import { FormEvent, useState } from 'react';
+import {
+  ArrowRight,
+  Check,
+  Clock3,
+  FileText,
+  Mail,
+  MapPin,
+  Menu,
+  MessageCircle,
+  Phone,
+  Send,
+  Shirt,
+  Upload,
+  X,
+} from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
-const PHONE = '+32 491 50 05 29';
-const PHONE_RAW = '+32491500529';
-const EMAIL = 'jetez.lencre@outlook.com';
+type Service = 'textile' | 'paper';
+type Delivery = 'standard' | 'rapide' | 'express';
+
+type FormData = {
+  name: string;
+  email: string;
+  phone: string;
+  description: string;
+  textileType: string;
+  textileColor: string;
+  placements: string[];
+  paperFormat: string;
+  paperColor: string;
+  printMode: string;
+  delivery: Delivery;
+};
+
+const initialForm: FormData = {
+  name: '', email: '', phone: '', description: '', textileType: 'T-shirt', textileColor: 'Blanc', placements: ['Cœur'], paperFormat: 'A4', paperColor: 'Blanc', printMode: 'Noir & blanc', delivery: 'standard',
+};
 
 function App() {
-  return (
-    <div className="min-h-screen bg-white font-sans text-gray-800">
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [service, setService] = useState<Service>('textile');
+  const [form, setForm] = useState<FormData>(initialForm);
+  const [files, setFiles] = useState<File[]>([]);
+  const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
 
-      {/* Navigation */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img
-              src="/images/Projet_Logo.png"
-              alt="Logo Jetez l'Encre"
-              className="h-10 w-auto"
-            />
-            <span className="font-display font-700 text-[#1B3478] text-xl tracking-tight leading-tight">
-              Jetez l'Encre
-            </span>
-          </div>
-          <nav className="hidden sm:flex items-center gap-8 text-sm font-medium text-gray-600">
-            <a href="#activite" className="hover:text-[#1E90D8] transition-colors">L'activité</a>
-            <a href="#services" className="hover:text-[#1E90D8] transition-colors">Services</a>
-            <a href="#contact" className="hover:text-[#1E90D8] transition-colors">Contact</a>
-          </nav>
-          <a
-            href={`tel:${PHONE_RAW}`}
-            className="hidden sm:inline-flex items-center gap-2 bg-[#1B3478] text-white text-sm font-medium px-4 py-2 rounded-full hover:bg-[#162c63] transition-colors"
-          >
-            <Phone size={14} />
-            {PHONE}
-          </a>
-        </div>
+  const update = (key: keyof FormData, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const openQuote = (nextService: Service) => { setService(nextService); setQuoteOpen(true); setSubmitted(false); setError(''); };
+  const placementOptions = ['Cœur', 'Dos', 'Manche gauche', 'Manche droite', 'Col', 'Nuque'];
+  const deliveryInfo: Record<Delivery, { label: string; delay: string }> = {
+    standard: { label: 'Standard', delay: '~ 1 semaine' },
+    rapide: { label: 'Rapide', delay: 'Moins de 72h' },
+    express: { label: 'Express', delay: 'Moins de 24h' },
+  };
+  const togglePlacement = (option: string) => setForm((current) => ({
+    ...current,
+    placements: current.placements.includes(option)
+      ? current.placements.filter((item) => item !== option)
+      : [...current.placements, option],
+  }));
+
+  async function submitQuote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSending(true);
+    setError('');
+    const details = service === 'textile'
+      ? { textileType: form.textileType, textileColor: form.textileColor, placements: form.placements.join(', '), delivery: form.delivery }
+      : { paperFormat: form.paperFormat, paperColor: form.paperColor, printMode: form.printMode, delivery: form.delivery };
+
+    const { error: insertError } = await supabase.from('quote_requests').insert({
+      service, customer_name: form.name, customer_email: form.email, customer_phone: form.phone || null, description: form.description, details, attachment_names: files.map((file) => file.name),
+    });
+
+    if (insertError) {
+      console.error(insertError);
+      setError('Votre demande n’a pas pu être envoyée. Réessayez dans un instant.');
+      setSending(false);
+      return;
+    }
+
+    const subject = encodeURIComponent(`Demande de devis ${service === 'textile' ? 'textile' : 'papier'} — ${form.name}`);
+    const body = encodeURIComponent(`Bonjour Jetez l'Encre,\n\nNom : ${form.name}\nEmail : ${form.email}\nTéléphone : ${form.phone || 'Non renseigné'}\n\nProjet :\n${form.description}\n\nOptions :\n${Object.entries(details).map(([key, value]) => `${key} : ${value}`).join('\n')}\n\nFichiers sélectionnés : ${files.length ? files.map((file) => file.name).join(', ') : 'Aucun'}`);
+    window.location.href = `mailto:jetez.lencre@outlook.com?subject=${subject}&body=${body}`;
+    setSubmitted(true);
+    setSending(false);
+  }
+
+  return (
+    <div className="site-shell">
+      <header className="site-header">
+        <a className="brand" href="#accueil" aria-label="Jetez l'Encre, accueil"><img src="/Projet_Logo.png" alt="" /><span>Jetez <b>l’Encre</b></span></a>
+        <button className="menu-button" onClick={() => setMenuOpen((open) => !open)} aria-label="Ouvrir le menu"><Menu size={22} /></button>
+        <nav className={menuOpen ? 'main-nav is-open' : 'main-nav'}>
+          <a href="#services" onClick={() => setMenuOpen(false)}>Services</a>
+          <a href="#atelier" onClick={() => setMenuOpen(false)}>L’atelier</a>
+          <a href="#contact" onClick={() => setMenuOpen(false)}>Contact</a>
+          <button className="nav-cta" onClick={() => openQuote('textile')}>Demander un devis <ArrowRight size={16} /></button>
+        </nav>
       </header>
 
-      {/* Hero */}
-      <section className="pt-28 pb-24 px-6 bg-gradient-to-b from-[#e8f4fc] to-white">
-        <div className="max-w-3xl mx-auto text-center">
-          <img
-            src="/images/Projet_Logo.png"
-            alt="Jetez l'Encre"
-            className="h-32 w-auto mx-auto mb-8 drop-shadow-md"
-          />
-          <h1 className="font-display text-5xl sm:text-6xl font-bold text-[#1B3478] leading-tight mb-4">
-            Jetez l'Encre
-          </h1>
-          <p className="text-[#1E90D8] text-lg font-medium tracking-wide uppercase mb-6">
-            Sérigraphie artisanale sur textile — Namur
-          </p>
-          <p className="text-gray-600 text-lg leading-relaxed max-w-xl mx-auto mb-10">
-            Impression manuelle et traditionnelle de qualité, au coeur de la Wallonie.
-            Chaque pièce est réalisée à la main, avec soin et précision.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href={`https://wa.me/${PHONE_RAW}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 bg-[#1E90D8] text-white font-semibold px-8 py-3.5 rounded-full hover:bg-[#1a7fc4] transition-colors shadow-md hover:shadow-lg"
-            >
-              <MessageCircle size={18} />
-              Contacter via WhatsApp
-            </a>
-            <a
-              href={`mailto:${EMAIL}`}
-              className="inline-flex items-center justify-center gap-2 border-2 border-[#1B3478] text-[#1B3478] font-semibold px-8 py-3.5 rounded-full hover:bg-[#1B3478] hover:text-white transition-colors"
-            >
-              <Mail size={18} />
-              Envoyer un e-mail
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Divider */}
-      <div className="max-w-5xl mx-auto px-6">
-        <div className="h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
-      </div>
-
-      {/* About */}
-      <section id="activite" className="py-24 px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="font-display text-4xl font-bold text-[#1B3478] mb-4">L'activité</h2>
-            <p className="text-gray-500 text-lg max-w-xl mx-auto">
-              Un savoir-faire artisanal et local, ancré dans la tradition.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-8">
-            <div className="text-center p-8 rounded-2xl bg-[#e8f4fc] hover:shadow-md transition-shadow">
-              <div className="inline-flex items-center justify-center w-14 h-14 bg-[#1E90D8] text-white rounded-full mb-5">
-                <Award size={26} />
-              </div>
-              <h3 className="font-display font-semibold text-[#1B3478] text-xl mb-3">Artisanal</h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Chaque impression est réalisée à la main, avec des techniques traditionnelles de sérigraphie garantissant un rendu soigné et durable.
-              </p>
-            </div>
-            <div className="text-center p-8 rounded-2xl bg-[#e8f4fc] hover:shadow-md transition-shadow">
-              <div className="inline-flex items-center justify-center w-14 h-14 bg-[#1B3478] text-white rounded-full mb-5">
-                <MapPin size={26} />
-              </div>
-              <h3 className="font-display font-semibold text-[#1B3478] text-xl mb-3">Local</h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Basé à Namur, au coeur de la Wallonie. Une activité de proximité qui valorise le travail local et l'ancrage dans sa région.
-              </p>
-            </div>
-            <div className="text-center p-8 rounded-2xl bg-[#e8f4fc] hover:shadow-md transition-shadow">
-              <div className="inline-flex items-center justify-center w-14 h-14 bg-[#1E90D8] text-white rounded-full mb-5">
-                <Heart size={26} />
-              </div>
-              <h3 className="font-display font-semibold text-[#1B3478] text-xl mb-3">Passionné</h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Un métier manuel pratiqué avec passion, où chaque commande est traitée avec la même attention et le même engagement.
-              </p>
+      <main>
+        <section className="hero" id="accueil">
+          <div className="hero-content">
+            <div className="eyebrow"><span className="eyebrow-dot" /> Impression locale & authentique</div>
+            <h1>Donnez du relief<br />à <em>vos idées.</em></h1>
+            <p>Sérigraphie textile et impression papier, fabriquées avec soin et livrées directement chez vous.</p>
+            <div className="hero-actions">
+              <button className="button button-dark" onClick={() => openQuote('textile')}>Parler de votre projet <ArrowRight size={18} /></button>
+              <a className="text-link" href="#services">Découvrir nos services <span>↗</span></a>
             </div>
           </div>
-        </div>
-      </section>
+          <div className="hero-logo"><img src="/Projet_Logo.png" alt="Logo Jetez l'Encre" /></div>
+        </section>
 
-      {/* Divider */}
-      <div className="max-w-5xl mx-auto px-6">
-        <div className="h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
-      </div>
+        <section className="services section" id="services">
+          <div className="section-intro">
+            <div className="eyebrow"><span className="eyebrow-dot" /> Nos services</div>
+            <h2>Deux métiers,<br /><em>une même exigence.</em></h2>
+          </div>
+          <div className="service-grid">
+            <article className="service-card textile-card">
+              <div className="service-icon"><Shirt size={24} /></div>
+              <h3>Impression <em>textile</em></h3>
+              <p>Sérigraphie artisanale sur t-shirts, sweats, tabliers, vestes, gilets de chantier et plus encore. Des encres qui tiennent, des couleurs qui vivent.</p>
+              <button onClick={() => openQuote('textile')}>Créer mon projet <ArrowRight size={17} /></button>
+            </article>
+            <article className="service-card paper-card">
+              <div className="service-icon"><FileText size={24} /></div>
+              <h3>Impression <em>papier</em></h3>
+              <p>Vos documents A4 ou A3, en noir et blanc ou en couleur. Imprimés avec netteté, déposés directement chez vous.</p>
+              <button onClick={() => openQuote('paper')}>Faire ma demande <ArrowRight size={17} /></button>
+            </article>
+          </div>
+        </section>
 
-      {/* Services */}
-      <section id="services" className="py-24 px-6 bg-gradient-to-b from-white to-[#e8f4fc]">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="font-display text-4xl font-bold text-[#1B3478] mb-4">Services</h2>
-            <p className="text-gray-500 text-lg max-w-xl mx-auto">
-              Des impressions personnalisées pour tous vos projets sur textile.
-            </p>
+        <section className="atelier section" id="atelier">
+          <div className="section-intro">
+            <div className="eyebrow"><span className="eyebrow-dot" /> L’atelier</div>
+            <h2>Le beau travail<br /><em>prend forme.</em></h2>
           </div>
-          <div className="grid sm:grid-cols-2 gap-6">
-            <ServiceCard
-              icon={<Shirt size={22} />}
-              title="T-shirts & sweats"
-              description="Impression de logos, motifs ou textes sur t-shirts, sweats, hoodies et autres vêtements. Idéal pour créer une identité visuelle unique."
-            />
-            <ServiceCard
-              icon={<Users size={22} />}
-              title="Associations & clubs"
-              description="Réalisations pour associations sportives, culturelles, écoles et groupes. Petites et moyennes séries possibles."
-            />
-            <ServiceCard
-              icon={<Award size={22} />}
-              title="Événements & promotions"
-              description="Textile promotionnel pour vos événements, foires, stands ou lancements de produits. Un support visible et durable."
-            />
-            <ServiceCard
-              icon={<Heart size={22} />}
-              title="Projets personnels"
-              description="Impression sur mesure pour vos projets personnels : cadeaux, créations uniques, textiles de collection."
-            />
+          <div className="feature-list">
+            <div><Check size={18} /><span><b>Un accompagnement clair</b> à chaque étape de votre projet.</span></div>
+            <div><Check size={18} /><span><b>Une fabrication soignée</b> dans notre atelier à Andenne.</span></div>
+            <div><Check size={18} /><span><b>Une livraison à domicile</b> selon votre urgence.</span></div>
           </div>
-          <p className="text-center text-gray-500 text-sm mt-10">
-            Vous avez un projet particulier ? N'hésitez pas à me contacter pour en discuter.
-          </p>
-        </div>
-      </section>
+        </section>
 
-      {/* Contact */}
-      <section id="contact" className="py-24 px-6 bg-[#1B3478]">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="font-display text-4xl font-bold text-white mb-4">Me contacter</h2>
-          <p className="text-blue-200 text-lg mb-14">
-            Pour un devis, une question ou pour discuter de votre projet.
-          </p>
-          <div className="grid sm:grid-cols-3 gap-6 text-left">
-            <ContactCard
-              icon={<Phone size={22} />}
-              label="Téléphone & WhatsApp"
-              value={PHONE}
-              href={`tel:${PHONE_RAW}`}
-            />
-            <ContactCard
-              icon={<MessageCircle size={22} />}
-              label="WhatsApp"
-              value="Envoyer un message"
-              href={`https://wa.me/${PHONE_RAW}`}
-              external
-            />
-            <ContactCard
-              icon={<Mail size={22} />}
-              label="E-mail"
-              value={EMAIL}
-              href={`mailto:${EMAIL}`}
-            />
+        <section className="cta-band" id="contact">
+          <div>
+            <div className="eyebrow"><span className="eyebrow-dot" /> Contact</div>
+            <h2>On imprime<br /><em>quand vous voulez.</em></h2>
+            <p>Un besoin précis ou une idée encore floue ? Écrivez-nous, on vous répond avec une proposition claire et personnalisée.</p>
           </div>
-          <div className="mt-8 flex items-center justify-center gap-2 text-blue-200 text-sm">
-            <MapPin size={16} className="text-[#1E90D8] shrink-0" />
-            <span>Namur, Wallonie — Belgique</span>
+          <div className="cta-side">
+            <button className="button button-light" onClick={() => openQuote('textile')}>Demander un devis <ArrowRight size={18} /></button>
+            <div className="contact-info">
+              <p><MapPin size={16} /> Avenue Roi Albert 256, 5300 Andenne</p>
+              <p><Clock3 size={16} /> Tous les jours · 9h — 20h</p>
+              <p><Phone size={16} /> <a href="tel:+32491500529">0491 50 05 29</a></p>
+              <p><MessageCircle size={16} /> <a href="https://wa.me/32491500529" target="_blank" rel="noopener noreferrer">WhatsApp · 0491 50 05 29</a></p>
+              <p><Mail size={16} /> <a href="mailto:jetez.lencre@outlook.com">jetez.lencre@outlook.com</a></p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* Footer */}
-      <footer className="bg-[#0b163a] py-8 px-6 text-center">
-        <div className="flex items-center justify-center gap-3 mb-3">
-          <img src="/images/Projet_Logo.png" alt="Logo" className="h-7 w-auto opacity-80" />
-          <span className="text-white font-display font-semibold text-base">Jetez l'Encre</span>
-        </div>
-        <p className="text-blue-300 text-xs">
-          &copy; {new Date().getFullYear()} Jetez l'Encre — Sérigraphie artisanale sur textile — Namur, Belgique
-        </p>
+      <footer className="footer">
+        <a className="brand" href="#accueil"><img src="/Projet_Logo.png" alt="" /><span>Jetez <b>l’Encre</b></span></a>
+        <p>Impression textile & papier — Andenne, Belgique.</p>
+        <span>© 2024 Jetez l’Encre</span>
       </footer>
-    </div>
-  );
-}
 
-function ServiceCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <div className="flex gap-5 p-7 bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-gray-100">
-      <div className="shrink-0 inline-flex items-center justify-center w-11 h-11 bg-[#e8f4fc] text-[#1E90D8] rounded-xl">
-        {icon}
-      </div>
-      <div>
-        <h3 className="font-semibold text-[#1B3478] text-base mb-2">{title}</h3>
-        <p className="text-gray-600 text-sm leading-relaxed">{description}</p>
-      </div>
+      {quoteOpen && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setQuoteOpen(false); }}>
+          <div className="quote-modal">
+            <button className="close-modal" onClick={() => setQuoteOpen(false)} aria-label="Fermer"><X size={20} /></button>
+            {submitted ? (
+              <div className="success-state">
+                <div className="success-icon"><Check size={28} /></div>
+                <div className="eyebrow"><span className="eyebrow-dot" /> Demande envoyée</div>
+                <h2>Merci, <em>{form.name.split(' ')[0] || 'à vous'}.</em></h2>
+                <p>Votre message est prêt dans votre messagerie. Il ne reste plus qu’à l’envoyer à Jetez l’Encre pour que nous puissions vous répondre.</p>
+                <button className="button button-dark" onClick={() => setQuoteOpen(false)}>Retour au site <ArrowRight size={18} /></button>
+              </div>
+            ) : (
+              <>
+                <div className="eyebrow"><span className="eyebrow-dot" /> Parlons de votre projet</div>
+                <h2>Votre demande de<br /><em>devis gratuit.</em></h2>
+                <div className="service-switch">
+                  <button className={service === 'textile' ? 'active' : ''} onClick={() => setService('textile')}><Shirt size={17} /> Textile</button>
+                  <button className={service === 'paper' ? 'active' : ''} onClick={() => setService('paper')}><FileText size={17} /> Papier</button>
+                </div>
+                <form onSubmit={submitQuote}>
+                  <div className="form-grid">
+                    <label>Votre nom<input required value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="Prénom Nom" /></label>
+                    <label>Votre email<input required type="email" value={form.email} onChange={(event) => update('email', event.target.value)} placeholder="vous@exemple.fr" /></label>
+                  </div>
+                  <label>Téléphone <span className="optional">(facultatif)</span><input value={form.phone} onChange={(event) => update('phone', event.target.value)} placeholder="04xx xx xx xx" /></label>
+                  <label>Décrivez votre projet<textarea required rows={3} value={form.description} onChange={(event) => update('description', event.target.value)} placeholder={service === 'textile' ? 'Quantités, idée, couleurs, date souhaitée...' : 'Type de documents, quantités, date souhaitée...'} /></label>
+                  {service === 'textile' ? (
+                    <>
+                      <div className="form-grid two">
+                        <label>Textile<select value={form.textileType} onChange={(event) => update('textileType', event.target.value)}><option>T-shirt</option><option>Sweat / Pull</option><option>Tablier</option><option>Veste</option><option>Gilet de chantier</option><option>Autre</option></select></label>
+                        <label>Couleur<select value={form.textileColor} onChange={(event) => update('textileColor', event.target.value)}><option>Blanc</option><option>Noir</option><option>Bleu marine</option><option>Gris chiné</option><option>Autre</option></select></label>
+                      </div>
+                      <div className="placement-field">
+                        <span>Emplacement(s) à personnaliser</span>
+                        <div className="placement-chips">{placementOptions.map((option) => <button type="button" key={option} className={form.placements.includes(option) ? 'selected' : ''} onClick={() => togglePlacement(option)}>{form.placements.includes(option) && <Check size={13} />}{option}</button>)}</div>
+                        <small>Vous pouvez sélectionner plusieurs zones (ex. cœur + dos).</small>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="form-grid three">
+                      <label>Format<select value={form.paperFormat} onChange={(event) => update('paperFormat', event.target.value)}><option>A4</option><option>A3</option></select></label>
+                      <label>Papier<select value={form.paperColor} onChange={(event) => update('paperColor', event.target.value)}><option>Blanc</option><option>Crème</option><option>Couleur au choix</option></select></label>
+                      <label>Impression<select value={form.printMode} onChange={(event) => update('printMode', event.target.value)}><option>Noir & blanc</option><option>Couleur</option></select></label>
+                    </div>
+                  )}
+                  <div className="form-bottom">
+                    <div className="delivery">
+                      <span>Livraison souhaitée</span>
+                      <div>{(['standard', 'rapide', 'express'] as Delivery[]).map((option) => <button type="button" key={option} className={form.delivery === option ? 'selected' : ''} onClick={() => setForm((current) => ({ ...current, delivery: option }))}><span className="delivery-name">{deliveryInfo[option].label}</span><span className="delivery-delay">{deliveryInfo[option].delay}</span></button>)}</div>
+                      <p className="delivery-note">Les délais peuvent varier selon votre projet. Voir nos conditions de vente ou échangez avec notre personnel pour une adaptation à votre demande.</p>
+                    </div>
+                    <label className="upload"><Upload size={17} /><span>{files.length ? `${files.length} fichier${files.length > 1 ? 's' : ''} sélectionné${files.length > 1 ? 's' : ''}` : 'Joindre un fichier'}</span><input type="file" multiple accept="image/*,.pdf" onChange={(event) => setFiles(Array.from(event.target.files || []))} /></label>
+                  </div>
+                  {error && <p className="form-error">{error}</p>}
+                  <button className="button button-dark submit-button" disabled={sending}>{sending ? 'Envoi en cours…' : 'Envoyer ma demande'} <Send size={17} /></button>
+                  <small>Vos informations servent uniquement à répondre à votre demande.</small>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
-  );
-}
-
-function ContactCard({ icon, label, value, href, external }: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  href: string;
-  external?: boolean;
-}) {
-  return (
-    <a
-      href={href}
-      target={external ? '_blank' : undefined}
-      rel={external ? 'noopener noreferrer' : undefined}
-      className="flex flex-col gap-3 p-6 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl transition-colors group"
-    >
-      <div className="inline-flex items-center justify-center w-11 h-11 bg-[#1E90D8] text-white rounded-xl">
-        {icon}
-      </div>
-      <div>
-        <p className="text-blue-300 text-xs font-medium uppercase tracking-wider mb-1">{label}</p>
-        <p className="text-white text-sm font-medium group-hover:text-[#1E90D8] transition-colors break-all">{value}</p>
-      </div>
-    </a>
   );
 }
 
