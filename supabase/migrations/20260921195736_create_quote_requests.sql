@@ -25,42 +25,32 @@
 CREATE TABLE IF NOT EXISTS public.quote_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at timestamptz NOT NULL DEFAULT now(),
-  service text NOT NULL CHECK (service IN ('textile', 'paper')),
+
+  service text NOT NULL
+    CHECK (service IN ('textile', 'paper')),
+
   customer_name text NOT NULL,
   customer_email text NOT NULL,
   customer_phone text,
   description text NOT NULL,
+
   details jsonb NOT NULL DEFAULT '{}'::jsonb,
   attachment_names jsonb NOT NULL DEFAULT '[]'::jsonb,
-  status text NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'contacted', 'in_progress', 'completed'))
+
+  status text NOT NULL DEFAULT 'new'
+    CHECK (status IN ('new', 'contacted', 'in_progress', 'completed'))
 );
 
 ALTER TABLE public.quote_requests ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Public can submit quote requests" ON public.quote_requests;
+DROP POLICY IF EXISTS "Public can submit quote requests"
+ON public.quote_requests;
+
 CREATE POLICY "Public can submit quote requests"
-  ON public.quote_requests FOR INSERT
-  TO anon, authenticated
-  WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public can view quote requests" ON public.quote_requests;
-CREATE POLICY "Public can view quote requests"
-  ON public.quote_requests FOR SELECT
-  TO anon, authenticated
-  USING (true);
-
-DROP POLICY IF EXISTS "Public can update quote requests" ON public.quote_requests;
-CREATE POLICY "Public can update quote requests"
-  ON public.quote_requests FOR UPDATE
-  TO anon, authenticated
-  USING (true)
-  WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public can delete quote requests" ON public.quote_requests;
-CREATE POLICY "Public can delete quote requests"
-  ON public.quote_requests FOR DELETE
-  TO anon, authenticated
-  USING (true);
+ON public.quote_requests
+FOR INSERT
+TO anon, authenticated
+WITH CHECK (true);
 
 CREATE INDEX IF NOT EXISTS quote_requests_created_at_idx
-  ON public.quote_requests (created_at DESC);
+ON public.quote_requests (created_at DESC);
